@@ -9,6 +9,7 @@ export interface AppearanceSettings {
     primary: string;
     background: string;
     accent: string;
+    faviconUrl?: string;
 }
 
 // --- General Settings ---

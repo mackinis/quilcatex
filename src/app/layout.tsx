@@ -51,15 +51,15 @@ function PageLayout({ children }: { children: React.ReactNode }) {
           document.title = loadedSettings.general.siteName;
         }
 
-        // Set Favicon
-        if (loadedSettings.general?.faviconUrl) {
+        // Set Favicon from Appearance settings
+        if (loadedSettings.appearance?.faviconUrl) {
             let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
             if (!link) {
                 link = document.createElement('link');
                 link.rel = 'icon';
                 document.head.appendChild(link);
             }
-            link.href = loadedSettings.general.faviconUrl;
+            link.href = loadedSettings.appearance.faviconUrl;
         }
 
         // Set Theme Colors

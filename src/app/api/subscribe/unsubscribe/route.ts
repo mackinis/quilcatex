@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         getEmailTemplates()
     ]);
     const siteName = settings?.general?.displayName || 'Tu Tienda';
-    const primaryColor = 'hsl(180 50% 45%)';
+    const primaryColor = settings?.appearance?.primary ? `hsl(${settings.appearance.primary})` : '#14b8a6';
 
     const title = templates.unsubscribeTitle || "Desuscripción Exitosa";
     const description = (templates.unsubscribeDescription || "Has sido dado de baja de la lista de correo de {siteName}.\nYa no recibirás más correos nuestros.")

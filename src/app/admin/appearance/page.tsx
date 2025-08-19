@@ -18,6 +18,7 @@ const appearanceSchema = z.object({
   primary: z.string().regex(/^(\d{1,3})\s(\d{1,3})%\s(\d{1,3})%$/, { message: "Formato HSL inválido (ej: 180 50% 45%)" }),
   background: z.string().regex(/^(\d{1,3})\s(\d{1,3})%\s(\d{1,3})%$/, { message: "Formato HSL inválido (ej: 210 20% 98%)" }),
   accent: z.string().regex(/^(\d{1,3})\s(\d{1,3})%\s(\d{1,3})%$/, { message: "Formato HSL inválido (ej: 180 50% 90%)" }),
+  faviconUrl: z.string().url("Debe ser una URL válida").or(z.literal('')).optional(),
 });
 
 type AppearanceFormData = z.infer<typeof appearanceSchema>;
@@ -33,6 +34,7 @@ export default function AppearancePage() {
       primary: "180 50% 45%",
       background: "210 20% 98%",
       accent: "180 50% 90%",
+      faviconUrl: "",
     },
   });
 
@@ -87,6 +89,7 @@ export default function AppearancePage() {
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
           </CardContent>
         </Card>
       </div>
@@ -101,15 +104,16 @@ export default function AppearancePage() {
       <Card>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardHeader>
-            <CardTitle>Colores del Tema</CardTitle>
+            <CardTitle>Colores y Favicon</CardTitle>
             <CardDescription>
-              Modifica los colores principales de tu sitio. Usa formato HSL (ej: "210 10% 23%").
+              Modifica los colores principales de tu sitio y el ícono de la pestaña del navegador.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="primary-color">Color Primario (botones, enlaces)</Label>
               <Input id="primary-color" {...form.register("primary")} />
+              <p className="text-xs text-muted-foreground">Usa formato HSL (ej: "210 10% 23%").</p>
               {form.formState.errors.primary && <p className="text-sm text-destructive">{form.formState.errors.primary.message}</p>}
             </div>
             <div className="space-y-2">
@@ -121,6 +125,11 @@ export default function AppearancePage() {
               <Label htmlFor="accent-color">Color de Acento (resaltados, fondos secundarios)</Label>
               <Input id="accent-color" {...form.register("accent")} />
                {form.formState.errors.accent && <p className="text-sm text-destructive">{form.formState.errors.accent.message}</p>}
+            </div>
+             <div className="space-y-2 border-t pt-6">
+              <Label htmlFor="favicon-url">URL del Favicon (opcional)</Label>
+              <Input id="favicon-url" {...form.register("faviconUrl")} placeholder="https://ejemplo.com/favicon.ico"/>
+              {form.formState.errors.faviconUrl && <p className="text-sm text-destructive">{form.formState.errors.faviconUrl.message}</p>}
             </div>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? "Guardando..." : "Guardar Cambios"}
