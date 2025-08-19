@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useHydratedCart } from "@/hooks/use-cart.tsx";
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useSearchParams } from 'next/navigation'
 import { useToast } from "@/hooks/use-toast";
 
-export default function CheckoutSuccessPage() {
+function SuccessPageContent() {
     const { items, clearCart, getTotalPrice } = useHydratedCart();
     const { toast } = useToast();
     const searchParams = useSearchParams();
@@ -59,5 +59,13 @@ export default function CheckoutSuccessPage() {
                 <Link href="/">Volver a la Tienda</Link>
             </Button>
         </div>
+    );
+}
+
+export default function CheckoutSuccessPage() {
+    return (
+        <Suspense fallback={<div>Cargando...</div>}>
+            <SuccessPageContent />
+        </Suspense>
     );
 }
