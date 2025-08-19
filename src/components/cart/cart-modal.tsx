@@ -5,11 +5,28 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter
 import { Button } from "@/components/ui/button";
 import { useHydratedCart } from "@/hooks/use-cart.tsx";
 import { ScrollArea } from "../ui/scroll-area";
-import { Trash, ShoppingCart } from "lucide-react";
+import { Trash, ShoppingCart, Plus, Minus, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { formatCurrency } from "@/lib/utils";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function CartModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (isOpen: boolean) => void }) {
-  const { items, removeFromCart, clearCart, getTotalPrice } = useHydratedCart();
+  const { items, addToCart, decreaseQuantity, removeFromCart, clearCart, getTotalPrice, closeCart } = useHydratedCart();
+  const router = useRouter();
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const handleCheckout = () => {
+    setIsNavigating(true);
+    router.push('/checkout/details');
+    closeCart();
+  };
+  
+  // Reset loading state if modal is closed manually
+  if (!isOpen && isNavigating) {
+    setIsNavigating(false);
+  }
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -30,14 +47,18 @@ export function CartModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCha
                         </div>
                         <div>
                             <h3 className="font-medium">{item.name}</h3>
-                            <p className="text-sm text-muted-foreground">Cantidad: {item.quantity}</p>
-                             <p className="text-sm font-semibold">AR$ {(item.price * item.quantity).toFixed(2)}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Unitario: $ {formatCurrency(item.price)}
+                            </p>
+                             <div className="flex items-center gap-2 mt-2">
+                                <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => decreaseQuantity(item.id)}><Minus className="h-3 w-3"/></Button>
+                                <span className="w-5 text-center">{item.quantity}</span>
+                                <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => addToCart(item)}><Plus className="h-3 w-3"/></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeFromCart(item.id)}><Trash className="h-4 w-4"/></Button>
+                             </div>
                         </div>
                     </div>
-                    <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeFromCart(item.id)}>
-                        <Trash className="h-4 w-4" />
-                        <span className="sr-only">Eliminar</span>
-                    </Button>
+                     <p className="font-semibold text-right">$ {formatCurrency(item.price * item.quantity)}</p>
                   </div>
                 ))}
               </div>
@@ -59,11 +80,14 @@ export function CartModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCha
             <SheetFooter className="gap-2 border-t p-6">
                  <div className="flex w-full items-center justify-between">
                     <p className="text-lg font-semibold">Total:</p>
-                    <p className="text-lg font-semibold">AR$ {getTotalPrice().toFixed(2)}</p>
+                    <p className="text-lg font-semibold">$ {formatCurrency(getTotalPrice())}</p>
                 </div>
                 <div className="flex w-full gap-2">
                     <Button variant="outline" className="w-full" onClick={() => clearCart()}>Vaciar Carrito</Button>
-                    <Button className="w-full">Finalizar Compra</Button>
+                     <Button onClick={handleCheckout} className="w-full" disabled={isNavigating}>
+                        {isNavigating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Finalizar Compra
+                    </Button>
                 </div>
             </SheetFooter>
         )}

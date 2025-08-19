@@ -13,6 +13,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -27,16 +28,28 @@ export default function ProductsPage() {
     }
     fetchProducts();
   }, []);
+  
+  const handleOpenModal = (product: Product | null = null) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
+  }
 
-  const handleProductAdded = (newProduct: Product) => {
-    setProducts(prevProducts => [...prevProducts, newProduct]);
+  const handleProductSaved = (savedProduct: Product) => {
+    const isNew = !products.some(p => p.id === savedProduct.id);
+    if (isNew) {
+      setProducts(prevProducts => [savedProduct, ...prevProducts]);
+    } else {
+      setProducts(prevProducts =>
+        prevProducts.map(p => (p.id === savedProduct.id ? savedProduct : p))
+      );
+    }
   };
 
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Productos</h2>
-        <Button onClick={() => setIsModalOpen(true)}>
+        <Button onClick={() => handleOpenModal()}>
           <PlusCircle className="mr-2 h-4 w-4" /> Añadir Producto
         </Button>
       </div>
@@ -46,13 +59,14 @@ export default function ProductsPage() {
           <CardDescription>Administra el catálogo de productos de tu tienda.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ProductTable products={products} isLoading={isLoading} />
+          <ProductTable products={products} isLoading={isLoading} onEdit={handleOpenModal} />
         </CardContent>
       </Card>
       <ProductModal
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}
-        onProductAdded={handleProductAdded}
+        onProductSaved={handleProductSaved}
+        productToEdit={editingProduct}
       />
     </div>
   );

@@ -5,6 +5,8 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { getSettings } from '@/lib/settings-service';
+
 
 const generateToken = () => {
     // A more secure and URL-friendly token
@@ -28,6 +30,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Un administrador ya ha sido registrado y verificado.' }, { status: 409 });
     }
 
+    const settings = await getSettings();
+    const emailSettings = settings?.emails;
+    const siteName = settings?.general?.siteName || 'Tu Tienda';
+
     const token = generateToken();
     const tokenExpires = Date.now() + 3600000; // 1 hour from now
 
@@ -43,26 +49,40 @@ export async function POST(request: Request) {
     
     const transporter = nodemailer.createTransport({
         host: process.env.EMAIL_HOST,
-        port: parseInt(process.env.EMAIL_PORT || '587'),
-        secure: (process.env.EMAIL_PORT === '465'), 
+        port: 465,
+        secure: true, 
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
         },
     });
 
+    const defaultSubject = `Tu Token de Verificación de Admin para ${siteName}`;
+    const defaultBody = `Hola {fullName},\n\nGracias por registrarte como administrador en ${siteName}.\n\nUsa el siguiente token para completar tu registro. Este token es válido por 1 hora.\n\nToken: {token}\n\nSi no solicitaste este registro, puedes ignorar este correo.\n\nSaludos,\nEl equipo de ${siteName}`;
+    
+    const subjectTemplate = emailSettings?.adminRegistration?.subject || defaultSubject;
+    const bodyTemplate = emailSettings?.adminRegistration?.body || defaultBody;
+
+    const replacements = {
+        '{siteName}': siteName,
+        '{fullName}': fullName,
+        '{email}': email,
+        '{token}': token,
+    };
+
+    const applyReplacements = (template: string) => {
+        let result = template;
+        for (const [key, value] of Object.entries(replacements)) {
+            result = result.replace(new RegExp(key, 'g'), value);
+        }
+        return result;
+    };
+
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: `"${process.env.EMAIL_FROM_NAME || siteName}" <${process.env.EMAIL_FROM}>`,
       to: email,
-      subject: 'Tu Token de Verificación para QuilCatex',
-      html: `
-        <h1>Hola ${fullName},</h1>
-        <p>Gracias por registrarte como administrador en QuilCatex.</p>
-        <p>Usa el siguiente token para completar tu registro. Este token es válido por 1 hora.</p>
-        <h2><b>${token}</b></h2>
-        <p>Si no solicitaste este registro, puedes ignorar este correo.</p>
-        <p>Saludos,<br/>El equipo de QuilCatex</p>
-      `,
+      subject: applyReplacements(subjectTemplate),
+      html: applyReplacements(bodyTemplate).replace(/\n/g, '<br>'),
     };
 
     await transporter.sendMail(mailOptions);
@@ -71,8 +91,8 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error en register-admin:', error);
-    if(error.code === 'ERR_TLS_CERT_ALTNAME_INVALID') {
-        return NextResponse.json({ message: 'Error de configuración del servidor de correo.' }, { status: 500 });
+    if(error.code === 'EAUTH' || error.code === 'EENVELOPE') {
+        return NextResponse.json({ message: 'Error de configuración del servidor de correo. Revisa las credenciales.' }, { status: 500 });
     }
     return NextResponse.json({ message: 'Error interno del servidor.', error: error.message }, { status: 500 });
   }

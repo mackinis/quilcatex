@@ -1,135 +1,144 @@
 
 "use client";
 
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { getSettings, type HeroSettings } from '@/lib/settings-service';
-import { Skeleton } from '../ui/skeleton';
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { Skeleton } from "../ui/skeleton";
+import { getSettings, type HeroSettings } from "@/lib/settings-service";
 
-const YouTubeEmbed = ({ url, opacity }: { url: string; opacity: number }) => {
-    try {
-        const urlObject = new URL(url);
-        let videoId = urlObject.searchParams.get('v');
-        if (!videoId && (urlObject.hostname === 'youtu.be')) {
-            videoId = urlObject.pathname.substring(1);
-        }
-        if (!videoId) return null;
-
-        const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&showinfo=0&autohide=1&modestbranding=1&vq=hd1080`;
-
-        return (
-            <iframe
-                src={embedUrl}
-                frameBorder="0"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full object-cover -z-10"
-                style={{ opacity, pointerEvents: 'none' }}
-            ></iframe>
-        );
-    } catch (error) {
-        console.error("Invalid YouTube URL:", error);
-        return <div className="absolute inset-0 bg-destructive flex items-center justify-center text-destructive-foreground -z-10">URL de YouTube inválida</div>;
-    }
-};
-
-const renderBackground = (settings: HeroSettings) => {
-    const { mediaType, mediaUrl, mediaOpacity } = settings;
-    const opacity = mediaOpacity ?? 1;
-
-    switch (mediaType) {
-        case 'video':
-            return (
-                <video
-                    src={mediaUrl}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="absolute inset-0 w-full h-full object-cover -z-10"
-                    style={{ opacity }}
-                ></video>
-            );
-        case 'youtube':
-            return <YouTubeEmbed url={mediaUrl} opacity={opacity} />;
-        case 'image':
-        default:
-            return (
-                <Image
-                    src={mediaUrl}
-                    alt="Hero background"
-                    fill
-                    className="object-cover -z-10"
-                    style={{ opacity }}
-                    data-ai-hint="store interior"
-                    priority
-                />
-            );
-    }
-};
+const defaultSettings: HeroSettings = {
+    title: "Soluciones Innovadoras para un Mundo Moderno",
+    subtitle: "En QuilCatex, ofrecemos productos y servicios de primer nivel diseñados para elevar tu experiencia e impulsar el éxito.",
+    backgroundType: 'image',
+    backgroundImageUrl: "https://placehold.co/1920x1080",
+    backgroundVideoUrl: "",
+    primaryButtonText: "Explorar Productos",
+    primaryButtonLink: "#products",
+    secondaryButtonText: "Ponerse en Contacto",
+    secondaryButtonLink: "#contact",
+}
 
 export function HeroSection() {
-  const [settings, setSettings] = useState<HeroSettings | null>(null);
+  const [settings, setSettings] = useState<HeroSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function loadSettings() {
+    const fetchHeroSettings = async () => {
+      setIsLoading(true);
       try {
         const loadedSettings = await getSettings();
-        setSettings(loadedSettings?.hero || null);
+        if(loadedSettings && loadedSettings.hero) {
+            setSettings(loadedSettings.hero);
+        }
       } catch (error) {
-        console.error("Failed to load hero settings", error);
+        console.error("No se pudo cargar la configuración del Hero, usando valores por defecto.", error);
       } finally {
         setIsLoading(false);
       }
     }
-    loadSettings();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <section className="relative h-[60vh] md:h-[80vh] w-full flex items-center justify-center bg-muted">
-        <div className="container mx-auto px-4 text-center">
-            <Skeleton className="h-12 w-3/4 mx-auto mb-4" />
-            <Skeleton className="h-6 w-1/2 mx-auto mb-8" />
-            <Skeleton className="h-12 w-48 mx-auto" />
-        </div>
-      </section>
-    )
+    fetchHeroSettings();
+  }, [])
+  
+  const getYouTubeVideoId = (url: string): string | null => {
+      if (!url) return null;
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
   }
 
-  const {
-    title = "Calidad y Estilo en un Solo Lugar",
-    subtitle = "Descubre nuestra colección exclusiva de productos diseñados para mejorar tu día a día.",
-    buttonText = "Explorar Productos",
-    mediaType = 'image',
-    mediaUrl = "https://placehold.co/1920x1080.png",
-    mediaOpacity = 1,
-  } = settings || {};
-  
-  const finalSettings = { title, subtitle, buttonText, mediaType, mediaUrl, mediaOpacity };
+  const renderBackground = () => {
+    if (isLoading) {
+      return <Skeleton className="h-full w-full" />;
+    }
+
+    switch (settings.backgroundType) {
+      case 'video':
+        return (
+          <video
+            key={settings.backgroundVideoUrl}
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          >
+            <source src={settings.backgroundVideoUrl} type="video/mp4" />
+          </video>
+        );
+      case 'youtube':
+        const videoId = getYouTubeVideoId(settings.backgroundVideoUrl || '');
+        if (!videoId) return <div className="absolute inset-0 bg-destructive flex items-center justify-center text-destructive-foreground">URL de YouTube inválida</div>;
+        return (
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <iframe
+                className="absolute top-1/2 left-1/2 w-[calc(100vw*1.5)] h-[calc(100vh*1.5)] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&showinfo=0&autohide=1&modestbranding=1`}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="YouTube video background"
+            ></iframe>
+          </div>
+        );
+      case 'image':
+      default:
+        return (
+           <Image
+                src={settings.backgroundImageUrl || defaultSettings.backgroundImageUrl!}
+                alt="Imagen de fondo del héroe"
+                fill
+                className="object-cover"
+                priority
+            />
+        );
+    }
+  };
 
   return (
-    <section className="relative h-[60vh] md:h-[80vh] w-full flex items-center justify-center overflow-hidden text-white">
-        {renderBackground(finalSettings)}
-        <div className="absolute inset-0 bg-black/50 -z-10" />
-        <div className="container relative z-10 mx-auto px-4 text-center">
-            <div className='bg-black/30 backdrop-blur-sm p-8 rounded-xl inline-block'>
-                <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4 text-white drop-shadow-lg animate-fade-in-down">
-                {title}
-                </h1>
-                <p className="text-lg md:text-xl max-w-3xl mx-auto mb-8 drop-shadow-md animate-fade-in-up">
-                {subtitle}
-                </p>
-                <Link href="#products">
-                <Button size="lg" className="animate-fade-in">
-                    {buttonText}
-                </Button>
-                </Link>
+    <section id="home" className="relative w-full h-[75vh] min-h-[600px] flex items-center justify-center text-white overflow-hidden">
+      <div className="absolute inset-0 z-0">
+         {renderBackground()}
+        <div className="absolute inset-0 bg-black/50" />
+      </div>
+      <div className="relative z-10 text-center px-4">
+        {isLoading ? (
+            <div className="flex flex-col items-center gap-4">
+                <Skeleton className="h-12 w-3/4 md:w-1/2" />
+                <Skeleton className="h-6 w-full max-w-3xl" />
+                 <Skeleton className="h-6 w-full max-w-2xl" />
+                <div className="flex gap-4 mt-4">
+                    <Skeleton className="h-12 w-40" />
+                    <Skeleton className="h-12 w-40" />
+                </div>
             </div>
-        </div>
+        ) : (
+            <>
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4 text-shadow-lg">
+                    {settings.title}
+                </h1>
+                <p className="max-w-3xl mx-auto text-lg md:text-xl text-neutral-200 mb-8 text-shadow">
+                   {settings.subtitle}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button size="lg" asChild>
+                    <a href={settings.primaryButtonLink}>{settings.primaryButtonText}</a>
+                </Button>
+                <Button size="lg" variant="secondary" asChild>
+                    <a href={settings.secondaryButtonLink}>{settings.secondaryButtonText}</a>
+                </Button>
+                </div>
+            </>
+        )}
+      </div>
+      <style jsx>{`
+        .text-shadow-lg {
+          text-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .text-shadow {
+          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+      `}</style>
     </section>
   );
 }

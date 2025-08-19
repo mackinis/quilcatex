@@ -35,6 +35,7 @@ export async function POST(request: Request) {
         ...userData,
         createdAt: serverTimestamp(),
         verified: true,
+        status: 'active', // Ensure status is set on creation
     });
     
     // Clean up pending registration

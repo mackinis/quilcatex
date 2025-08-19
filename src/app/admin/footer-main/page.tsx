@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { getSettings, saveSettings, type FooterSettings } from "@/lib/settings-s
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trash, Plus } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const footerLinkSchema = z.object({
   text: z.string().min(1, "El texto es requerido"),
@@ -34,8 +35,12 @@ const footerContactSchema = z.object({
 
 const footerSchema = z.object({
   newsletterText: z.string().min(1, "El texto del boletín es requerido"),
+  brandDisplay: z.enum(['logoAndName', 'logoOnly', 'nameOnly']).default('logoAndName'),
   columns: z.array(footerColumnSchema),
   contact: footerContactSchema,
+  aboutUsText: z.string().optional(),
+  privacyPolicyText: z.string().optional(),
+  termsOfServiceText: z.string().optional(),
 });
 
 type FooterFormData = z.infer<typeof footerSchema>;
@@ -49,8 +54,12 @@ export default function FooterMainPage() {
     resolver: zodResolver(footerSchema),
     defaultValues: {
       newsletterText: "",
+      brandDisplay: 'logoAndName',
       columns: [],
       contact: { address: "", email: "", phone: "" },
+      aboutUsText: "",
+      privacyPolicyText: "",
+      termsOfServiceText: "",
     },
   });
 
@@ -66,8 +75,12 @@ export default function FooterMainPage() {
         if (settings && settings.footer) {
           form.reset({
             newsletterText: settings.footer.newsletterText || "Mantente al día...",
+            brandDisplay: settings.footer.brandDisplay || 'logoAndName',
             columns: settings.footer.columns || [],
             contact: settings.footer.contact || { address: "", email: "", phone: "" },
+            aboutUsText: settings.footer.aboutUsText || "Somos QuilCatex...",
+            privacyPolicyText: settings.footer.privacyPolicyText || "Tu privacidad es importante...",
+            termsOfServiceText: settings.footer.termsOfServiceText || "Al usar nuestro sitio...",
           });
         }
       } catch (error) {
@@ -82,7 +95,6 @@ export default function FooterMainPage() {
   const onSubmit = async (data: FooterFormData) => {
     setIsSaving(true);
     try {
-      // We only want to save the 'footer' part of the settings
       const settingsToSave = { footer: data as Partial<FooterSettings> };
       await saveSettings(settingsToSave);
       toast({ title: "Éxito", description: "La configuración del Footer se ha guardado." });
@@ -136,22 +148,41 @@ export default function FooterMainPage() {
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardHeader>
             <CardTitle>Editor del Footer Principal</CardTitle>
-            <CardDescription>Modifica los enlaces y la información del pie de página principal.</CardDescription>
+            <CardDescription>Modifica los enlaces, información y textos legales del pie de página.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
 
              <div className="space-y-4 rounded-lg border p-4">
-                <h3 className="font-semibold text-foreground">Columna 1: Boletín (Newsletter)</h3>
+                <h3 className="font-semibold text-foreground">Columna 1: Boletín y Marca</h3>
                 <div className="space-y-2">
                     <Label htmlFor="newsletter-text">Texto del Boletín</Label>
                     <Textarea id="newsletter-text" {...form.register("newsletterText")} />
                     {form.formState.errors.newsletterText && <p className="text-sm text-destructive">{form.formState.errors.newsletterText.message}</p>}
                 </div>
+                <Controller
+                    control={form.control}
+                    name="brandDisplay"
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                        <Label>Visualización de la Marca</Label>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar cómo mostrar la marca" />
+                            </SelectTrigger>
+                            <SelectContent>
+                            <SelectItem value="logoAndName">Logo y Nombre</SelectItem>
+                            <SelectItem value="logoOnly">Solo Logo</SelectItem>
+                            <SelectItem value="nameOnly">Solo Nombre</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        </div>
+                    )}
+                />
             </div>
 
             <div className="space-y-4 rounded-lg border p-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-foreground">Columnas 2 y 3: Enlaces</h3>
+                    <h3 className="font-semibold text-foreground">Columnas de Enlaces</h3>
                     <Button type="button" variant="outline" size="sm" onClick={addColumn}>
                         <Plus className="mr-2 h-4 w-4"/> Añadir Columna
                     </Button>
@@ -187,7 +218,7 @@ export default function FooterMainPage() {
             </div>
             
              <div className="space-y-4 rounded-lg border p-4">
-                <h3 className="font-semibold text-foreground">Columna 4: Contacto</h3>
+                <h3 className="font-semibold text-foreground">Columna de Contacto</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div className="space-y-2">
                         <Label htmlFor="contact-address">Dirección</Label>
@@ -204,6 +235,21 @@ export default function FooterMainPage() {
                         <Input id="contact-phone" {...form.register(`contact.phone`)} />
                          {form.formState.errors.contact?.phone && <p className="text-sm text-destructive">{form.formState.errors.contact.phone.message}</p>}
                     </div>
+                </div>
+            </div>
+             <div className="space-y-4 rounded-lg border p-4">
+                <h3 className="font-semibold text-foreground">Textos Legales</h3>
+                 <div className="space-y-2">
+                    <Label htmlFor="about-us-text">Sobre Nosotros</Label>
+                    <Textarea id="about-us-text" {...form.register("aboutUsText")} rows={5} placeholder="Describe brevemente tu empresa..."/>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="privacy-policy-text">Política de Privacidad</Label>
+                    <Textarea id="privacy-policy-text" {...form.register("privacyPolicyText")} rows={5} placeholder="Detalla cómo manejas los datos de los usuarios..."/>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="terms-of-service-text">Términos de Servicio</Label>
+                    <Textarea id="terms-of-service-text" {...form.register("termsOfServiceText")} rows={5} placeholder="Define las reglas y condiciones de uso de tu sitio..."/>
                 </div>
             </div>
             

@@ -19,6 +19,18 @@ export function AdminChatView({ chatId, session }: AdminChatViewProps) {
     const [newMessage, setNewMessage] = useState("");
     const { toast } = useToast();
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    const [adminName, setAdminName] = useState('Soporte');
+
+    useEffect(() => {
+        // The assistant name is now sourced directly and only from the session data,
+        // which is what is configured in the admin panel.
+        if (session.assistantName) {
+            setAdminName(session.assistantName);
+        } else {
+            setAdminName('Soporte'); // Fallback
+        }
+    }, [session.assistantName]);
+
 
     useEffect(() => {
         if (chatId) {
@@ -46,8 +58,7 @@ export function AdminChatView({ chatId, session }: AdminChatViewProps) {
         const text = newMessage;
         setNewMessage("");
         try {
-            // TODO: Get admin name from session/auth context
-            await sendMessage(chatId, { text, sender: "agent", senderName: "Soporte" });
+            await sendMessage(chatId, { text, sender: "agent", senderName: adminName });
             setTimeout(() => scrollToBottom(), 100);
         } catch (error) {
             console.error("Error sending message:", error);
@@ -58,15 +69,14 @@ export function AdminChatView({ chatId, session }: AdminChatViewProps) {
 
     return (
         <div className="flex flex-col h-full">
-            <header className="p-4 border-b flex justify-between items-center">
+            <header className="p-4 border-b flex justify-between items-center shrink-0">
                 <div>
                     <h3 className="text-lg font-bold">{session.userInfo.name}</h3>
                     <p className="text-sm text-muted-foreground">{session.userInfo.email}</p>
                 </div>
-                {/* You can add more actions here, like closing a chat */}
             </header>
-            <div className="flex-grow p-0 overflow-hidden">
-                <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
+            <div className="flex-1 flex flex-col justify-between">
+                <ScrollArea className="p-4 max-h-[calc(100vh-22rem)]" ref={scrollAreaRef}>
                     <div className="space-y-4">
                         {messages.map((msg) => (
                              <div
@@ -91,7 +101,7 @@ export function AdminChatView({ chatId, session }: AdminChatViewProps) {
                                                 : "bg-primary text-primary-foreground"
                                         }`}
                                     >
-                                        <p>{msg.text}</p>
+                                        <p className="text-sm">{msg.text}</p>
                                         <p className={`text-xs mt-1 ${
                                             msg.sender === 'user' ? 'text-right text-muted-foreground/80' : 'text-right text-primary-foreground/80'
                                             }`}>
@@ -103,21 +113,21 @@ export function AdminChatView({ chatId, session }: AdminChatViewProps) {
                         ))}
                     </div>
                 </ScrollArea>
+                <footer className="shrink-0 p-4 border-t bg-background">
+                     <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
+                        <Input
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Escribe una respuesta..."
+                            autoComplete="off"
+                        />
+                        <Button type="submit" size="icon">
+                            <Send className="h-4 w-4" />
+                            <span className="sr-only">Enviar</span>
+                        </Button>
+                    </form>
+                </footer>
             </div>
-            <footer className="flex-shrink-0 p-4 border-t">
-                 <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-                    <Input
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Escribe una respuesta..."
-                        autoComplete="off"
-                    />
-                    <Button type="submit" size="icon">
-                        <Send className="h-4 w-4" />
-                        <span className="sr-only">Enviar</span>
-                    </Button>
-                </form>
-            </footer>
         </div>
     );
 }

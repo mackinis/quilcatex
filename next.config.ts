@@ -13,24 +13,30 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'rchbytec.com.ar',
         port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: 'placehold.co',
+        hostname: 'youtube.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.youtube.com',
         port: '',
         pathname: '/**',
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-        config.externals.push('bcryptjs')
-    }
-    return config
-  }
 };
 
 export default nextConfig;

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,21 +12,25 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getSettings, saveSettings, type FooterSettings } from "@/lib/settings-service";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, Trash, GripVertical, ArrowDown, ArrowUp } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const socialSchema = z.object({
-    twitter: z.string().url("URL inválida").or(z.literal('')),
-    facebook: z.string().url("URL inválida").or(z.literal('')),
-    instagram: z.string().url("URL inválida").or(z.literal('')),
+const socialLinkSchema = z.object({
+    icon: z.string().min(1, "Debe seleccionar un icono."),
+    href: z.string().url("URL inválida").or(z.literal('')),
 });
 
 const copyrightSchema = z.object({
-  social: socialSchema,
+  social: z.array(socialLinkSchema),
+  socialIconSize: z.coerce.number().min(10, "El tamaño debe ser al menos 10.").optional(),
   copyrightText: z.string().min(1, "El texto de copyright es requerido"),
   developerName: z.string().optional(),
   developerUrl: z.string().url("URL inválida").or(z.literal('')).optional(),
 });
 
 type CopyrightFormData = z.infer<typeof copyrightSchema>;
+
+const availableIcons = ["Twitter", "Facebook", "Instagram", "Linkedin", "Youtube", "Tiktok"];
 
 export default function FooterCopyrightPage() {
   const { toast } = useToast();
@@ -36,11 +40,17 @@ export default function FooterCopyrightPage() {
   const form = useForm<CopyrightFormData>({
     resolver: zodResolver(copyrightSchema),
     defaultValues: {
-      social: { twitter: "", facebook: "", instagram: "" },
+      social: [],
+      socialIconSize: 24,
       copyrightText: `© ${new Date().getFullYear()} QuilCatex. Todos los derechos reservados.`,
       developerName: "",
       developerUrl: "",
     },
+  });
+
+  const { fields, append, remove, swap } = useFieldArray({
+    control: form.control,
+    name: "social",
   });
 
   useEffect(() => {
@@ -49,7 +59,8 @@ export default function FooterCopyrightPage() {
         const settings = await getSettings();
         if (settings && settings.footer) {
           form.reset({
-              social: settings.footer.social || { twitter: "", facebook: "", instagram: "" },
+              social: settings.footer.social || [],
+              socialIconSize: settings.footer.socialIconSize || 24,
               copyrightText: settings.footer.copyrightText || `© ${new Date().getFullYear()} QuilCatex. Todos los derechos reservados.`,
               developerName: settings.footer.developerName || "",
               developerUrl: settings.footer.developerUrl || "",
@@ -107,24 +118,53 @@ export default function FooterCopyrightPage() {
               <Input id="copyright-text" {...form.register("copyrightText")} />
               {form.formState.errors.copyrightText && <p className="text-sm text-destructive">{form.formState.errors.copyrightText.message}</p>}
             </div>
+            
             <div className="space-y-4 border-t pt-6">
-                <Label>Redes Sociales</Label>
-                 <div className="space-y-2">
-                    <Label htmlFor="social-twitter" className="text-sm font-normal">Twitter / X</Label>
-                    <Input id="social-twitter" {...form.register("social.twitter")} placeholder="https://twitter.com/usuario" />
-                    {form.formState.errors.social?.twitter && <p className="text-sm text-destructive">{form.formState.errors.social.twitter.message}</p>}
+                <div className="flex justify-between items-center">
+                    <Label>Redes Sociales</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => append({ icon: 'Twitter', href: '' })}>
+                        <Plus className="mr-2 h-4 w-4"/> Añadir Red Social
+                    </Button>
                 </div>
                  <div className="space-y-2">
-                    <Label htmlFor="social-facebook" className="text-sm font-normal">Facebook</Label>
-                    <Input id="social-facebook" {...form.register("social.facebook")} placeholder="https://facebook.com/pagina" />
-                    {form.formState.errors.social?.facebook && <p className="text-sm text-destructive">{form.formState.errors.social.facebook.message}</p>}
+                    <Label htmlFor="social-icon-size" className="text-sm font-normal">Tamaño de Íconos (px)</Label>
+                    <Input id="social-icon-size" type="number" {...form.register("socialIconSize")} className="w-24"/>
+                    {form.formState.errors.socialIconSize && <p className="text-sm text-destructive">{form.formState.errors.socialIconSize.message}</p>}
                 </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="social-instagram" className="text-sm font-normal">Instagram</Label>
-                    <Input id="social-instagram" {...form.register("social.instagram")} placeholder="https://instagram.com/usuario" />
-                    {form.formState.errors.social?.instagram && <p className="text-sm text-destructive">{form.formState.errors.social.instagram.message}</p>}
+                 <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md">
+                        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                        <Select
+                          onValueChange={(value) => form.setValue(`social.${index}.icon`, value)}
+                          defaultValue={field.icon}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Seleccionar icono" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableIcons.map(iconName => (
+                              <SelectItem key={iconName} value={iconName}>{iconName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      <Input {...form.register(`social.${index}.href`)} placeholder="URL de la red social" className="flex-1" />
+                       <div className="flex flex-col">
+                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" disabled={index === 0} onClick={() => swap(index, index - 1)}>
+                                <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" disabled={index === fields.length - 1} onClick={() => swap(index, index + 1)}>
+                                <ArrowDown className="h-4 w-4" />
+                            </Button>
+                        </div>
+                      <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
             </div>
+
             <div className="space-y-4 border-t pt-6">
                 <Label>Información del Desarrollador</Label>
                  <div className="space-y-2">

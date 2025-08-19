@@ -14,7 +14,8 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import type { LiveChatConfig } from "@/lib/settings-service";
-
+import { onSettingsSnapshot } from "@/lib/settings-service";
+import { cn } from "@/lib/utils";
 
 const LiveChatIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <MessageSquare {...props} />
@@ -33,7 +34,26 @@ interface LiveChatProps {
     config: LiveChatConfig;
 }
 
-export function LiveChat({ config }: LiveChatProps) {
+const checkIsOnline = (config: LiveChatConfig): boolean => {
+    if (config.forceOnline) return true;
+    if (!config.schedule) return true; // Default to online if no schedule is set
+
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const todayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust to match our array (Mon=0)
+    const todaySchedule = config.schedule[todayIndex];
+
+    if (!todaySchedule || !todaySchedule.enabled) {
+        return false;
+    }
+
+    return currentTime >= todaySchedule.open && currentTime <= todaySchedule.close;
+};
+
+
+export function LiveChat({ config: initialConfig }: LiveChatProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
@@ -41,6 +61,9 @@ export function LiveChat({ config }: LiveChatProps) {
     const [isStartingSession, setIsStartingSession] = useState(false);
     const [currentUser, setCurrentUser] = useState<{name: string} | null>(null);
     const [hasUnread, setHasUnread] = useState(false);
+    const [isOnline, setIsOnline] = useState(true);
+    const [isInputFocused, setIsInputFocused] = useState(false);
+    const [config, setConfig] = useState<LiveChatConfig>(initialConfig);
 
     const { toast } = useToast();
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -52,19 +75,44 @@ export function LiveChat({ config }: LiveChatProps) {
             phone: "",
         }
     });
+    
+    useEffect(() => {
+        const unsubscribe = onSettingsSnapshot((settings) => {
+            if (settings?.chat?.liveChat) {
+                setConfig(settings.chat.liveChat);
+                document.documentElement.style.setProperty('--chat-user-bubble', settings.chat.liveChat.userBubbleColor || 'hsl(var(--primary))');
+            }
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        setIsOnline(checkIsOnline(config));
+        const interval = setInterval(() => {
+             setIsOnline(checkIsOnline(config));
+        }, 60000); // Check every minute
+        return () => clearInterval(interval);
+    }, [config]);
+
 
     useEffect(() => {
         const storedChatId = localStorage.getItem("liveChatId");
         if (storedChatId) {
-            const storedUserInfo = localStorage.getItem("liveChatUser");
-            if(storedUserInfo) {
-                setCurrentUser(JSON.parse(storedUserInfo));
-            }
-            setChatId(storedChatId);
-
             getChatSession(storedChatId).then(session => {
                 if (session) {
+                    const storedUserInfo = localStorage.getItem("liveChatUser");
+                    if(storedUserInfo) {
+                        setCurrentUser(JSON.parse(storedUserInfo));
+                    }
+                    setChatId(storedChatId);
                     setHasUnread(session.unread);
+                } else {
+                    // Chat was deleted by admin, clean up local storage
+                    localStorage.removeItem("liveChatId");
+                    localStorage.removeItem("liveChatUser");
+                    setChatId(null);
+                    setCurrentUser(null);
                 }
             });
         }
@@ -111,14 +159,17 @@ export function LiveChat({ config }: LiveChatProps) {
     const handleStartChat = async (data: UserInfo) => {
         setIsStartingSession(true);
         try {
-            const welcomeMessage = config.welcomeMessage || "¡Hola {name}! Gracias por contactarnos. Un agente te atenderá en breve.";
+            const initialMessage = isOnline 
+                ? config.welcomeMessage || "¡Hola {name}! Gracias por contactarnos. Un agente te atenderá en breve."
+                : config.offlineMessage || "Estamos fuera de línea. Déjanos un mensaje y te responderemos pronto.";
+            
             const assistantName = config.assistantName || "Soporte";
             
             const newChatId = await createChatSession({
                 name: data.name,
                 email: data.email,
                 phone: data.phone,
-            }, welcomeMessage, assistantName);
+            }, initialMessage, assistantName);
             
             const userInfo = { name: data.name };
             setCurrentUser(userInfo);
@@ -137,6 +188,18 @@ export function LiveChat({ config }: LiveChatProps) {
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newMessage.trim() === "" || !chatId || !currentUser) return;
+
+        // Check if chat session still exists before sending
+        const sessionExists = await getChatSession(chatId);
+        if (!sessionExists) {
+            toast({ variant: 'destructive', title: 'Chat finalizado', description: 'Esta conversación fue finalizada por un administrador. Inicia una nueva.' });
+            localStorage.removeItem("liveChatId");
+            localStorage.removeItem("liveChatUser");
+            setChatId(null);
+            setCurrentUser(null);
+            setNewMessage("");
+            return;
+        }
 
         const text = newMessage;
         setNewMessage("");
@@ -161,7 +224,7 @@ export function LiveChat({ config }: LiveChatProps) {
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(handleStartChat)} className="space-y-4">
                             <p className="text-sm text-muted-foreground">
-                                Para comenzar, por favor, déjanos tus datos.
+                                { isOnline ? 'Para comenzar, déjanos tus datos.' : 'Déjanos tu mensaje y te contactaremos a la brevedad.'}
                             </p>
                             <FormField control={form.control} name="name" render={({ field }) => (
                                 <FormItem><FormLabel>Nombre *</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} /></FormControl><FormMessage /></FormItem>
@@ -206,7 +269,7 @@ export function LiveChat({ config }: LiveChatProps) {
                                             className={`rounded-lg px-3 py-2 text-sm ${
                                                 msg.sender === "agent"
                                                     ? "bg-muted text-muted-foreground"
-                                                    : "bg-primary text-primary-foreground"
+                                                    : "bg-chat-user-bubble text-primary-foreground"
                                             }`}
                                         >
                                             <p>{msg.text}</p>
@@ -227,6 +290,8 @@ export function LiveChat({ config }: LiveChatProps) {
                         <Input
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
+                            onFocus={() => setIsInputFocused(true)}
+                            onBlur={() => setIsInputFocused(false)}
                             placeholder="Escribe un mensaje..."
                             autoComplete="off"
                         />
@@ -264,14 +329,17 @@ export function LiveChat({ config }: LiveChatProps) {
 
             {isOpen && (
                 <div className="fixed bottom-24 left-6 z-50">
-                    <Card className="w-80 h-[32rem] flex flex-col shadow-2xl">
+                    <Card className={cn(
+                        "w-80 h-[32rem] flex flex-col shadow-2xl transition-transform duration-300 ease-in-out",
+                         isInputFocused ? "sm:transform-none -translate-y-24" : ""
+                    )}>
                         <CardHeader className="flex-shrink-0 flex flex-row justify-between items-center border-b">
                             <div className="space-y-1">
                                 <CardTitle className="text-base">{config.chatTitle || 'Chat de Soporte'}</CardTitle>
                                 <CardDescription className="text-xs">
-                                    {config.isOnline 
+                                    {isOnline 
                                         ? `Online: ${config.assistantName}`
-                                        : 'Déjanos un mensaje.'}
+                                        : 'Fuera de línea'}
                                 </CardDescription>
                             </div>
                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggleChat(false)}>
@@ -286,5 +354,3 @@ export function LiveChat({ config }: LiveChatProps) {
         </>
     );
 }
-
-    

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,15 +12,23 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { getSettings, saveSettings, type ChatSettings } from "@/lib/settings-service";
+import { getSettings, saveSettings, type ChatSettings, type Schedule } from "@/lib/settings-service";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 
-// Zod schemas for validation
+const scheduleEntrySchema = z.object({
+  day: z.string(),
+  enabled: z.boolean(),
+  open: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Formato HH:MM" }),
+  close: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: "Formato HH:MM" }),
+});
+
 const whatsappSchema = z.object({
   whatsappEnabled: z.boolean(),
   whatsappNumber: z.string().optional(),
   whatsappMessage: z.string().optional(),
   whatsappIconUrl: z.string().url().optional().or(z.literal('')),
+  buttonColor: z.string().optional(),
 });
 
 const liveChatSchema = z.object({
@@ -28,14 +36,19 @@ const liveChatSchema = z.object({
   chatTitle: z.string().optional(),
   assistantName: z.string().optional(),
   welcomeMessage: z.string().optional(),
-  isOnline: z.boolean(),
+  offlineMessage: z.string().optional(),
+  forceOnline: z.boolean(),
   requestUserInfo: z.boolean(),
   liveChatIconUrl: z.string().url().optional().or(z.literal('')),
   notificationColor: z.string().optional(),
+  userBubbleColor: z.string().optional(),
+  schedule: z.array(scheduleEntrySchema).optional(),
 });
 
 type WhatsappFormData = z.infer<typeof whatsappSchema>;
 type LiveChatFormData = z.infer<typeof liveChatSchema>;
+
+const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 export default function ChatsPage() {
   const { toast } = useToast();
@@ -50,6 +63,7 @@ export default function ChatsPage() {
       whatsappNumber: "",
       whatsappMessage: "",
       whatsappIconUrl: "",
+      buttonColor: "#25D366",
     },
   });
 
@@ -60,11 +74,19 @@ export default function ChatsPage() {
       chatTitle: "Chat de Soporte",
       assistantName: "Soporte",
       welcomeMessage: "¡Hola! Gracias por contactarnos. Un agente te atenderá en breve.",
-      isOnline: true,
+      offlineMessage: "Estamos fuera de línea. Déjanos un mensaje y te responderemos pronto.",
+      forceOnline: false,
       requestUserInfo: true,
       liveChatIconUrl: "",
       notificationColor: "#16A34A",
+      userBubbleColor: "",
+      schedule: daysOfWeek.map(day => ({ day, enabled: true, open: '09:00', close: '18:00' })),
     },
+  });
+
+   const { fields, update } = useFieldArray({
+    control: liveChatForm.control,
+    name: "schedule",
   });
 
   useEffect(() => {
@@ -79,18 +101,27 @@ export default function ChatsPage() {
                 whatsappNumber: whatsapp.phoneNumber,
                 whatsappMessage: whatsapp.predefinedMessage,
                 whatsappIconUrl: whatsapp.iconUrl,
+                buttonColor: whatsapp.buttonColor || "#25D366",
             });
           }
           if (liveChat) {
+             const schedule = daysOfWeek.map(day => {
+              const existingDay = liveChat.schedule?.find(s => s.day === day);
+              return existingDay || { day, enabled: false, open: '09:00', close: '18:00' };
+            });
+
             liveChatForm.reset({
                 liveChatEnabled: liveChat.enabled,
                 chatTitle: liveChat.chatTitle,
                 assistantName: liveChat.assistantName,
                 welcomeMessage: liveChat.welcomeMessage,
-                isOnline: liveChat.isOnline,
+                offlineMessage: liveChat.offlineMessage || "Estamos fuera de línea. Déjanos un mensaje y te responderemos pronto.",
+                forceOnline: liveChat.forceOnline || false,
                 requestUserInfo: liveChat.requestUserInfo,
                 liveChatIconUrl: liveChat.iconUrl,
                 notificationColor: liveChat.notificationColor,
+                userBubbleColor: liveChat.userBubbleColor,
+                schedule: schedule
             });
           }
         }
@@ -116,6 +147,7 @@ export default function ChatsPage() {
           phoneNumber: data.whatsappNumber || "",
           predefinedMessage: data.whatsappMessage || "",
           iconUrl: data.whatsappIconUrl || "",
+          buttonColor: data.buttonColor || "#25D366",
         },
       };
       await saveSettings({ chat: settings });
@@ -143,10 +175,13 @@ export default function ChatsPage() {
           chatTitle: data.chatTitle || "Chat de Soporte",
           assistantName: data.assistantName || "Soporte",
           welcomeMessage: data.welcomeMessage || "¡Hola! ¿En qué podemos ayudarte?",
-          isOnline: data.isOnline,
+          offlineMessage: data.offlineMessage || "Estamos fuera de línea.",
+          forceOnline: data.forceOnline,
           requestUserInfo: data.requestUserInfo,
           iconUrl: data.liveChatIconUrl || "",
           notificationColor: data.notificationColor || "#16A34A",
+          userBubbleColor: data.userBubbleColor,
+          schedule: data.schedule,
         },
       };
       await saveSettings({ chat: settings });
@@ -228,6 +263,10 @@ export default function ChatsPage() {
                 <Label htmlFor="whatsapp-icon">URL del Ícono Personalizado (opcional)</Label>
                 <Input id="whatsapp-icon" placeholder="https://ejemplo.com/icono.png" {...whatsappForm.register("whatsappIconUrl")} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-button-color">Color del Botón (Hex)</Label>
+                <Input type="color" id="whatsapp-button-color" {...whatsappForm.register("buttonColor")} className="p-1 h-10"/>
+              </div>
               <Button type="submit" disabled={isSavingWhatsapp}>
                 {isSavingWhatsapp ? "Guardando..." : "Guardar Configuración de WhatsApp"}
               </Button>
@@ -261,19 +300,14 @@ export default function ChatsPage() {
                 <Input id="assistant-name" placeholder="Ej: Sofía" {...liveChatForm.register("assistantName")} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="welcome-message">Mensaje de Bienvenida</Label>
+                <Label htmlFor="welcome-message">Mensaje de Bienvenida (Online)</Label>
                 <Textarea id="welcome-message" placeholder="Ej: ¡Hola! ¿En qué podemos ayudarte?" {...liveChatForm.register("welcomeMessage")} />
               </div>
-              <Controller
-                  control={liveChatForm.control}
-                  name="isOnline"
-                  render={({ field }) => (
-                     <div className="flex items-center space-x-2">
-                        <Switch id="livechat-online" checked={field.value} onCheckedChange={field.onChange} />
-                        <Label htmlFor="livechat-online">Marcar como "En línea"</Label>
-                     </div>
-                  )}
-              />
+               <div className="space-y-2">
+                <Label htmlFor="offline-message">Mensaje de Bienvenida (Offline)</Label>
+                <Textarea id="offline-message" placeholder="Ej: Estamos fuera de línea en este momento. Déjanos tu mensaje." {...liveChatForm.register("offlineMessage")} />
+              </div>
+
                <Controller
                   control={liveChatForm.control}
                   name="requestUserInfo"
@@ -288,13 +322,69 @@ export default function ChatsPage() {
                 <Label htmlFor="livechat-icon">URL del Ícono Personalizado (opcional)</Label>
                 <Input id="livechat-icon" placeholder="https://ejemplo.com/icono.png" {...liveChatForm.register("liveChatIconUrl")} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="notification-color">Color de Notificación (Hex)</Label>
-                <Input id="notification-color" placeholder="#FF0000" {...liveChatForm.register("notificationColor")} />
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label htmlFor="notification-color">Color de Notificación</Label>
+                    <Input type="color" id="notification-color" {...liveChatForm.register("notificationColor")} className="p-1 h-10"/>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="user-bubble-color">Color Globo Chat (Usuario)</Label>
+                    <Input type="color" id="user-bubble-color" {...liveChatForm.register("userBubbleColor")} className="p-1 h-10"/>
+                  </div>
               </div>
-              <div>
-                  <p className="text-sm text-muted-foreground">La gestión de conversaciones y mensajes se realizará desde la sección de administración de chats.</p>
+
+              <div className="space-y-4 pt-4 border-t">
+                  <h4 className="font-medium text-foreground">Horario de Atención</h4>
+                  <div className="flex items-center space-x-2">
+                    <Controller
+                        control={liveChatForm.control}
+                        name="forceOnline"
+                        render={({ field }) => (
+                           <Switch id="force-online" checked={field.value} onCheckedChange={field.onChange} />
+                        )}
+                    />
+                    <Label htmlFor="force-online">Forzar estado "En línea"</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Define cuándo el chat aparecerá como "En línea" automáticamente. Activar el interruptor de arriba anulará este horario.</p>
+                  <div className="space-y-2">
+                    {fields.map((field, index) => {
+                      const isEnabled = liveChatForm.watch(`schedule.${index}.enabled`);
+                      return (
+                        <div key={field.id} className="grid grid-cols-4 items-center gap-2">
+                           <div className="flex items-center gap-2 col-span-1">
+                             <Controller
+                                control={liveChatForm.control}
+                                name={`schedule.${index}.enabled`}
+                                render={({ field: checkboxField }) => (
+                                    <Checkbox
+                                        id={`schedule-enabled-${index}`}
+                                        checked={checkboxField.value}
+                                        onCheckedChange={checkboxField.onChange}
+                                    />
+                                )}
+                             />
+                            <Label htmlFor={`schedule-enabled-${index}`} className="font-semibold">{field.day}</Label>
+                          </div>
+                           <div className="col-span-1">
+                            <Input 
+                                type="time" 
+                                {...liveChatForm.register(`schedule.${index}.open`)}
+                                disabled={!isEnabled}
+                            />
+                           </div>
+                           <div className="col-span-1">
+                             <Input 
+                                type="time" 
+                                {...liveChatForm.register(`schedule.${index}.close`)}
+                                disabled={!isEnabled}
+                            />
+                           </div>
+                        </div>
+                      )
+                    })}
+                  </div>
               </div>
+              
               <Button type="submit" disabled={isSavingLiveChat}>
                 {isSavingLiveChat ? "Guardando..." : "Guardar Configuración de Chat en Vivo"}
               </Button>

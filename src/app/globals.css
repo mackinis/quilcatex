@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -37,6 +38,7 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --chat-user-bubble: hsl(var(--primary));
   }
  
   .dark {
@@ -72,6 +74,7 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    --chat-user-bubble: hsl(var(--primary));
   }
 }
  
@@ -84,5 +87,149 @@
   }
   html {
     scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .offer-ribbon {
+    @apply absolute z-10 p-2 text-center font-bold uppercase tracking-wider text-white shadow-md;
+    width: 200px;
+  }
+
+  .offer-ribbon-title {
+    @apply offer-ribbon text-xs;
+    top: 22px;
+    left: -53px;
+    transform: rotate(-45deg);
+  }
+  .offer-ribbon-title::before,
+  .offer-ribbon-title::after {
+    content: "";
+    position: absolute;
+    border-style: solid;
+    border-color: transparent;
+  }
+  .offer-ribbon-title::before {
+    top: 0;
+    left: -16px;
+    border-width: 0 16px 16px 0;
+    border-right-color: inherit;
+    filter: brightness(0.7);
+  }
+  .offer-ribbon-title::after {
+    bottom: 0;
+    right: -16px;
+    border-width: 16px 16px 0 0;
+    border-top-color: inherit;
+    filter: brightness(0.7);
+  }
+
+  .offer-ribbon-discount {
+    @apply offer-ribbon text-black text-xs;
+    top: 22px;
+    right: -53px;
+    transform: rotate(45deg);
+  }
+   .offer-ribbon-discount::before,
+  .offer-ribbon-discount::after {
+    content: "";
+    position: absolute;
+    border-style: solid;
+    border-color: transparent;
+  }
+  .offer-ribbon-discount::before {
+    top: 0;
+    right: -16px;
+    border-width: 0px 0px 16px 16px;
+    border-left-color: inherit;
+    filter: brightness(0.7);
+  }
+  .offer-ribbon-discount::after {
+    bottom: 0;
+    left: -16px;
+    border-width: 16px 0 0 16px;
+    border-top-color: inherit;
+    filter: brightness(0.7);
+  }
+
+  .star-tag {
+    @apply absolute z-10 w-24 h-24 flex items-center justify-center;
+  }
+  .star-tag-background {
+    @apply absolute w-full h-full;
+    background-color: var(--star-color);
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  }
+  .star-tag-text {
+    @apply relative text-center font-bold text-white text-xs uppercase p-2 break-words;
+  }
+  .star-tag-title {
+    @apply star-tag;
+    top: -10px;
+    left: -10px;
+  }
+  .star-tag-discount {
+    @apply star-tag;
+    top: -10px;
+    right: -10px;
+  }
+  .star-tag-discount > .star-tag-text {
+    @apply text-black;
+  }
+
+  .promotion-ribbon-text {
+    font-size: var(--title-text-size, 12px);
+  }
+  
+  .offer-ribbon-discount .promotion-ribbon-text {
+    font-size: var(--discount-text-size, 12px);
+  }
+
+  @media (max-width: 640px) {
+    .offer-ribbon {
+      width: 120px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+    }
+    .offer-ribbon-title {
+      top: 10px;
+      left: -30px;
+    }
+     .offer-ribbon-title::before {
+      border-width: 0 10px 12px 0;
+      left: -10px;
+    }
+    .offer-ribbon-title::after {
+      border-width: 12px 10px 0 0;
+      right: -10px;
+    }
+    .offer-ribbon-discount {
+      top: 10px;
+      right: -30px;
+    }
+    .offer-ribbon-discount::before {
+       border-width: 0px 0px 12px 10px;
+      right: -10px;
+    }
+    .offer-ribbon-discount::after {
+       border-width: 12px 0 0 10px;
+       left: -10px;
+    }
+    .star-tag {
+      width: 80px; 
+      height: 80px;
+    }
+    .star-tag-text {
+      font-size: 10px;
+      line-height: 1.2;
+    }
+    .promotion-ribbon-text {
+        font-size: 9px !important;
+        letter-spacing: -0.5px;
+        padding: 0 4px;
+    }
   }
 }

@@ -16,6 +16,9 @@ import { Switch } from "@/components/ui/switch";
 
 const generalSchema = z.object({
   siteName: z.string().min(1, { message: "El nombre del sitio es requerido." }),
+  displayName: z.string().optional(),
+  logoUrl: z.string().url("Debe ser una URL válida").or(z.literal('')).optional(),
+  faviconUrl: z.string().url("Debe ser una URL válida").or(z.literal('')).optional(),
   contactEmail: z.string().email({ message: "Debe ser un email válido." }),
   allowCountryChange: z.boolean(),
 });
@@ -31,6 +34,9 @@ export default function GeneralPage() {
     resolver: zodResolver(generalSchema),
     defaultValues: {
       siteName: "QuilCatex",
+      displayName: "",
+      logoUrl: "",
+      faviconUrl: "",
       contactEmail: "info@quilcatex.com",
       allowCountryChange: false,
     },
@@ -64,6 +70,8 @@ export default function GeneralPage() {
         title: "Éxito",
         description: "La configuración general se ha guardado correctamente.",
       });
+       // Optionally force a reload to see changes on other tabs
+       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
        toast({
         variant: "destructive",
@@ -99,14 +107,32 @@ export default function GeneralPage() {
       <Card>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardHeader>
-            <CardTitle>Ajustes Generales</CardTitle>
-            <CardDescription>Configura los ajustes generales de la aplicación.</CardDescription>
+            <CardTitle>Identidad del Sitio</CardTitle>
+            <CardDescription>Configura los ajustes de branding y contacto de la aplicación.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="siteName">Nombre del Sitio</Label>
-              <Input id="siteName" {...form.register("siteName")} />
-              {form.formState.errors.siteName && <p className="text-sm text-destructive">{form.formState.errors.siteName.message}</p>}
+              <Label htmlFor="displayName">Nombre para mostrar</Label>
+              <Input id="displayName" {...form.register("displayName")} placeholder="El nombre que ven tus clientes (ej: Mi Tienda)" />
+              {form.formState.errors.displayName && <p className="text-sm text-destructive">{form.formState.errors.displayName.message}</p>}
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl">URL del Logo (opcional)</Label>
+                  <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://ejemplo.com/logo.png"/>
+                  {form.formState.errors.logoUrl && <p className="text-sm text-destructive">{form.formState.errors.logoUrl.message}</p>}
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="faviconUrl">URL del Favicon (opcional)</Label>
+                  <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://ejemplo.com/favicon.ico"/>
+                   {form.formState.errors.faviconUrl && <p className="text-sm text-destructive">{form.formState.errors.faviconUrl.message}</p>}
+                </div>
+             </div>
+            <div className="space-y-2 border-t pt-6">
+               <Label htmlFor="siteName">Nombre del Sitio (para Pestañas y Emails)</Label>
+                <Input id="siteName" {...form.register("siteName")} />
+                <p className="text-xs text-muted-foreground">Este es el nombre que aparece en la pestaña del navegador y en los correos automáticos.</p>
+                {form.formState.errors.siteName && <p className="text-sm text-destructive">{form.formState.errors.siteName.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="contactEmail">Email de Contacto</Label>

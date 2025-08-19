@@ -11,7 +11,9 @@ import {
     updateDoc,
     DocumentData,
     getDoc,
-    where
+    where,
+    deleteDoc,
+    getDocs
 } from 'firebase/firestore';
 
 export interface UserInfo {
@@ -28,6 +30,7 @@ export interface ChatSession {
     lastMessage: string;
     unread: boolean;
     updatedAt?: number;
+    assistantName?: string;
 }
 
 export interface Message {
@@ -46,6 +49,7 @@ export const createChatSession = async (userInfo: UserInfo, welcomeMessage: stri
         
         const docRef = await addDoc(chatCollectionRef, {
             userInfo,
+            assistantName, // Save assistant name on session creation
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             status: 'open',
@@ -72,23 +76,31 @@ export const createChatSession = async (userInfo: UserInfo, welcomeMessage: stri
 // Function to send a message
 export const sendMessage = async (chatId: string, message: { text: string; sender: 'user' | 'agent', senderName: string }): Promise<void> => {
     try {
+        const chatDocRef = doc(db, 'chats', chatId);
+        
+        // First, verify the chat session exists before doing ANYTHING.
+        const chatDocSnap = await getDoc(chatDocRef);
+        if (!chatDocSnap.exists()) {
+            console.warn(`Chat session ${chatId} does not exist. Message not sent.`);
+            throw new Error('Chat session not found');
+        }
+        
+        // If it exists, proceed with adding the message and updating the document.
         const messagesCollectionRef = collection(db, 'chats', chatId, 'messages');
         await addDoc(messagesCollectionRef, {
             ...message,
             createdAt: serverTimestamp(),
         });
         
-        // Update last message and unread status on the chat document
-        const chatDocRef = doc(db, 'chats', chatId);
         await updateDoc(chatDocRef, {
              lastMessage: message.text,
              updatedAt: serverTimestamp(),
-             // unread for user if agent sent, unread for admin if user sent
              unread: true, 
         });
 
     } catch (error) {
         console.error("Error sending message: ", error);
+        // Re-throw the error so the calling component can handle it (e.g., clear local state)
         throw error;
     }
 };
@@ -134,7 +146,8 @@ export const onChatSessionsSnapshot = (callback: (sessions: ChatSession[]) => vo
                 status: data.status,
                 lastMessage: data.lastMessage,
                 unread: data.unread,
-                updatedAt: data.updatedAt?.toMillis()
+                updatedAt: data.updatedAt?.toMillis(),
+                assistantName: data.assistantName
             });
         });
         callback(sessions);
@@ -153,8 +166,10 @@ export const markChatAsRead = async (chatId: string): Promise<void> => {
             unread: false
         });
     } catch (error) {
-        console.error("Error marking chat as read: ", error);
-        // Don't throw, as it might not be critical for user flow
+        // This might fail if doc is deleted simultaneously. It's a non-critical error.
+        if ((error as any).code !== 'not-found') {
+            console.error("Error marking chat as read: ", error);
+        }
     }
 }
 
@@ -171,7 +186,8 @@ export const getChatSession = async (chatId: string): Promise<ChatSession | null
                 status: data.status,
                 lastMessage: data.lastMessage,
                 unread: data.unread,
-                updatedAt: data.updatedAt?.toMillis()
+                updatedAt: data.updatedAt?.toMillis(),
+                assistantName: data.assistantName
             };
         }
         return null;
@@ -181,4 +197,22 @@ export const getChatSession = async (chatId: string): Promise<ChatSession | null
     }
 };
 
+// Function to delete a chat session and its messages
+export const deleteChatSession = async (chatId: string): Promise<void> => {
+    try {
+        const chatDocRef = doc(db, 'chats', chatId);
+        const messagesCollectionRef = collection(chatDocRef, 'messages');
+
+        // Delete all messages in the subcollection
+        const messagesSnapshot = await getDocs(messagesCollectionRef);
+        const deletePromises = messagesSnapshot.docs.map((doc) => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+
+        // Delete the chat document itself
+        await deleteDoc(chatDocRef);
+    } catch (error) {
+        console.error("Error deleting chat session: ", error);
+        throw error;
+    }
+};
     

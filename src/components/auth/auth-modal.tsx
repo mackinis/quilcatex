@@ -67,6 +67,16 @@ export function AuthModal({ isOpen, onOpenChange, initialStep = 'login' }: AuthM
     setAdminData(null);
     setUserData(null);
   }
+  
+  const getDialogContentClass = () => {
+    switch(step) {
+        case 'register':
+        case 'userTokenVerification':
+            return "sm:max-w-lg";
+        default:
+            return "sm:max-w-md";
+    }
+  }
 
   const renderStep = () => {
     switch (step) {
@@ -166,7 +176,7 @@ export function AuthModal({ isOpen, onOpenChange, initialStep = 'login' }: AuthM
         }
         onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={getDialogContentClass()}>
         {renderStep()}
       </DialogContent>
     </Dialog>

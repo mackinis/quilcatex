@@ -62,12 +62,15 @@ export function LoginForm({ onSuccess, onProvisionalSuccess }: LoginFormProps) {
                 description: 'Has iniciado sesión correctamente.',
             });
             // Store session info
-            sessionStorage.setItem('admin-session', JSON.stringify(data.user));
+            sessionStorage.setItem('user-session', JSON.stringify(data.user));
+            // Dispatch event to notify other components like Header
+            window.dispatchEvent(new CustomEvent('session-change'));
+            
             onSuccess();
-            // a little delay to show the toast
-            setTimeout(() => {
-                 router.push('/admin/dashboard');
-            }, 500)
+
+            if (data.user.isAdmin) {
+                router.push('/admin/dashboard');
+            }
         }
 
     } catch (error: any) {

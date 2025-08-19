@@ -9,9 +9,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from './password-input';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { UserData } from './auth-modal';
+import { getSettings } from '@/lib/settings-service';
 
 const formSchema = z.object({
     name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres.' }),
@@ -32,12 +33,12 @@ const formSchema = z.object({
 
 type UserRegistrationFormProps = {
   onSuccess: (data: UserData) => void;
-  isCountryChangeable?: boolean; 
 };
 
-export function UserRegistrationForm({ onSuccess, isCountryChangeable = false }: UserRegistrationFormProps) {
+export function UserRegistrationForm({ onSuccess }: UserRegistrationFormProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCountryChangeable, setIsCountryChangeable] = useState(false);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -55,6 +56,20 @@ export function UserRegistrationForm({ onSuccess, isCountryChangeable = false }:
       confirmPassword: '',
     },
   });
+  
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const settings = await getSettings();
+        if (settings?.general?.allowCountryChange) {
+          setIsCountryChangeable(true);
+        }
+      } catch (error) {
+        console.error("Failed to load general settings for registration form", error);
+      }
+    }
+    loadSettings();
+  }, []);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsLoading(true);
@@ -90,8 +105,8 @@ export function UserRegistrationForm({ onSuccess, isCountryChangeable = false }:
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <ScrollArea className="h-72 w-full pr-4">
-        <div className="space-y-4">
+        <ScrollArea className="h-72 w-full pr-4" type="scroll">
+        <div className="space-y-4 px-1">
          <div className="grid grid-cols-2 gap-4">
             <FormField
             control={form.control}

@@ -10,21 +10,59 @@ import { getSettings, type AppSettings } from '@/lib/settings-service';
 import { CartProvider, useHydratedCart } from '@/hooks/use-cart.tsx';
 import { Header } from '@/components/layout/header';
 import { CartModal } from '@/components/cart/cart-modal';
+import { Footer } from '@/components/layout/footer';
+import { initMercadoPago } from '@mercadopago/sdk-react'
+import { usePathname } from 'next/navigation';
 
-function RootContent({ children }: { children: React.ReactNode }) {
+function ClientOnly({ children }: { children: React.ReactNode }) {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+    const mpKey = process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY;
+    if (mpKey) {
+        initMercadoPago(mpKey, { locale: 'es-AR' });
+    } else {
+        console.warn("Mercado Pago public key is not configured. Payment button will not work.");
+    }
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function PageLayout({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [siteName, setSiteName] = useState('QuilCatex');
   const { isCartOpen, closeCart } = useHydratedCart();
+  const pathname = usePathname();
+  const isAdminPage = pathname.startsWith('/admin');
 
   useEffect(() => {
     async function loadSettings() {
       const loadedSettings = await getSettings();
       if (loadedSettings) {
         setSettings(loadedSettings);
+        
+        // Set Site Name
         if (loadedSettings.general?.siteName) {
-          setSiteName(loadedSettings.general.siteName);
           document.title = loadedSettings.general.siteName;
         }
+
+        // Set Favicon
+        if (loadedSettings.general?.faviconUrl) {
+            let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'icon';
+                document.head.appendChild(link);
+            }
+            link.href = loadedSettings.general.faviconUrl;
+        }
+
+        // Set Theme Colors
         if (loadedSettings.appearance) {
           const root = document.documentElement;
           root.style.setProperty('--primary', loadedSettings.appearance.primary);
@@ -36,37 +74,20 @@ function RootContent({ children }: { children: React.ReactNode }) {
     loadSettings();
   }, []);
 
-  const chatSettings = settings?.chat;
-
   return (
-    <>
+    <div className="flex min-h-dvh flex-col bg-background">
       <Header />
-      {children}
-      <Toaster />
-      <CartModal isOpen={isCartOpen} onOpenChange={closeCart} />
-      
-      {chatSettings?.whatsapp?.enabled && (
-        <WhatsappButton 
-          phoneNumber={chatSettings.whatsapp.phoneNumber}
-          message={chatSettings.whatsapp.predefinedMessage}
-          iconUrl={chatSettings.whatsapp.iconUrl}
-        />
-      )}
-
-      {chatSettings?.liveChat?.enabled && (
-        <LiveChat 
-          config={{
-              chatTitle: chatSettings.liveChat.chatTitle,
-              assistantName: chatSettings.liveChat.assistantName,
-              welcomeMessage: chatSettings.liveChat.welcomeMessage,
-              isOnline: chatSettings.liveChat.isOnline,
-              requestUserInfo: chatSettings.liveChat.requestUserInfo,
-              iconUrl: chatSettings.liveChat.iconUrl,
-              notificationColor: chatSettings.liveChat.notificationColor,
-          }}
-        />
-      )}
-    </>
+      <main className="flex-1">
+        {children}
+      </main>
+      <Footer />
+      <ClientOnly>
+        <Toaster />
+        <CartModal isOpen={isCartOpen} onOpenChange={closeCart} />
+        {!isAdminPage && settings?.chat?.whatsapp?.enabled && <WhatsappButton />}
+        {!isAdminPage && settings?.chat?.liveChat?.enabled && <LiveChat config={settings.chat.liveChat} />}
+      </ClientOnly>
+    </div>
   );
 }
 
@@ -88,7 +109,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <CartProvider>
-          <RootContent>{children}</RootContent>
+          <PageLayout>{children}</PageLayout>
         </CartProvider>
       </body>
     </html>

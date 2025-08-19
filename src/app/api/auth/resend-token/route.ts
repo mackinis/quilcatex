@@ -6,7 +6,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
 const generateToken = () => {
-    return crypto.randomBytes(12).toString('hex').replace(/([a-zA-Z0-9]{4})/g, '$1-').slice(0, -1);
+    return crypto.randomBytes(18).toString('base64').replace(/\//g, '-').replace(/\+/g, '_');
 };
 
 export async function POST(request: Request) {
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
     
     const transporter = nodemailer.createTransport({
         host: process.env.EMAIL_HOST,
-        port: parseInt(process.env.EMAIL_PORT || '587'),
-        secure: false, 
+        port: 465,
+        secure: true, 
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM}>`,
       to: email,
       subject: 'Tu Nuevo Token de Verificación para QuilCatex',
       html: `
@@ -63,8 +63,8 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error en resend-token:', error);
-    if(error.code === 'ERR_TLS_CERT_ALTNAME_INVALID') {
-        return NextResponse.json({ message: 'Error de configuración del servidor de correo.' }, { status: 500 });
+    if(error.code === 'EAUTH' || error.code === 'EENVELOPE') {
+        return NextResponse.json({ message: 'Error de configuración del servidor de correo. Revisa las credenciales.' }, { status: 500 });
     }
     return NextResponse.json({ message: 'Error interno del servidor.', error: error.message }, { status: 500 });
   }
